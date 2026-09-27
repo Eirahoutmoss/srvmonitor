@@ -1,0 +1,94 @@
+{
+  // Bu dosyayı config.json olarak kopyalayıp kendi ortamınıza göre düzenleyin.
+  // "//" ile başlayan satırlar yorumdur ve yok sayılır.
+
+  "server_name": "PROD-DB-01",
+  "poll_seconds": 15,
+  // Servis ve Olay Günlüğü taraması daha ağırdır; ayrı ve daha seyrek çalışır.
+  "deep_seconds": 60,
+  "event_window_minutes": 30,
+  "event_max": 50,
+  "history_samples": 240,
+
+  "web": {
+    "listen": ":8085",
+    // Panoyu ve API'yi basit bir anahtarla korumak isterseniz doldurun.
+    // Boş bırakılırsa herkes erişebilir (yalnızca güvenli iç ağda kullanın).
+    "token": ""
+  },
+
+  // İZLENEN VERİTABANLARI — type: oracle | postgres | mysql (mariadb = mysql).
+  "databases": [
+    { "name": "PROD",     "type": "oracle",   "dsn": "oracle://izleyici:parola@10.0.0.10:1521/ORCLPDB1" },
+    { "name": "raporlar", "type": "postgres", "dsn": "postgres://izleyici:parola@10.0.0.11:5432/rapordb?sslmode=disable" },
+    { "name": "web",      "type": "mysql",    "dsn": "izleyici:parola@tcp(10.0.0.12:3306)/webdb" }
+  ],
+
+  // İZLENEN UYGULAMA/SERVİSLER — kendi uygulamanızı buraya ekleyin.
+  // Üç yolla izlenebilir: Windows servis adı, süreç adı ve/veya sağlık ucu.
+  "watch": {
+    "services": ["MSSQLSERVER", "W3SVC"],
+    "processes": ["MyApp.exe"],
+    "endpoints": [
+      { "name": "Sipariş API", "url": "http://localhost:8080/health", "expect_status": 200 },
+      { "name": "Ödeme Servisi", "tcp": "127.0.0.1:5000" }
+    ]
+  },
+
+  "rules": [
+    { "id": "cpu",      "desc": "CPU kullanımı",   "key": "cpu.percent",  "compare": "gt", "warn": 85, "crit": 95, "for": "2m",  "cooldown": "15m", "channels": ["email"] },
+    { "id": "mem",      "desc": "Bellek kullanımı","key": "mem.percent",  "compare": "gt", "warn": 85, "crit": 95, "for": "2m",  "cooldown": "15m", "channels": ["email"] },
+    { "id": "disk",     "desc": "Disk doluluğu",   "key": "disk.*.percent","compare":"gt", "warn": 85, "crit": 92, "for": "1m",  "cooldown": "30m", "channels": ["email","sms"] },
+    { "id": "db-up",   "desc": "Veritabanı erişimi","key":"db.PROD.up","compare":"lt","warn": 1,  "crit": 1,  "for": "0s",  "cooldown": "10m", "channels": ["email","sms"] },
+    { "id": "db-sess", "desc": "Bağlantı oranı","key":"db.PROD.session_percent","compare":"gt","warn":80,"crit":90,"for":"3m","cooldown":"20m","channels":["email"] },
+    { "id": "db-space",   "desc": "Depolama doluluğu","key":"db.PROD.space.*.percent","compare":"gt","warn":85,"crit":93,"for":"5m","cooldown":"1h","channels":["email"] },
+    { "id": "db-block","desc": "Bloklayan oturum", "key":"db.PROD.blocking","compare":"gt","warn":1,"crit":5,"for":"1m","cooldown":"15m","channels":["email"] },
+
+    // Derin teşhis: sorunlu servis ve kritik olay sayısı da alarm üretebilir.
+    { "id": "servis",   "desc": "Sorunlu servis",  "key": "services.problem", "compare":"gt","warn":0,"crit":1,"for":"0s","cooldown":"30m","channels":["email","sms"] },
+    { "id": "olay-krit","desc": "Kritik olay",     "key": "events.critical",  "compare":"gt","warn":0,"crit":1,"for":"0s","cooldown":"30m","channels":["email","sms"] },
+    { "id": "olay-hata","desc": "Hata olayı",      "key": "events.error",     "compare":"gt","warn":5,"crit":20,"for":"0s","cooldown":"1h","channels":["email"] },
+
+    // ERKEN UYARI: bir kaynağın (disk, bellek, oturum, tablespace) mevcut artış
+    // hızıyla dolmasına kaç saat kaldığını tahmin eder. 24 saatten yakınsa uyarı,
+    // 6 saatten yakınsa kritik e-posta gönderir — eşik AŞILMADAN önce.
+    { "id": "tahmin",   "desc": "Yaklaşan dolma riski", "key": "forecast.hours_to_full", "compare":"lt","warn":24,"crit":6,"for":"0s","cooldown":"2h","channels":["email","sms"] },
+
+    // İzlenen bir uygulama/servis/uç nokta düşerse anında bildir.
+    { "id": "izleme",   "desc": "İzlenen öğe çalışmıyor", "key": "watch.down", "compare":"gt","warn":0,"crit":1,"for":"0s","cooldown":"15m","channels":["email","sms"] }
+  ],
+
+  "email": {
+    "enabled": false,
+    "host": "smtp.sirket.com",
+    "port": 587,
+    "username": "izleme@sirket.com",
+    "password": "SMTP_PAROLASI",
+    "from": "izleme@sirket.com",
+    "to": ["bt-ekip@sirket.com"],
+    "starttls": true
+  },
+
+  // DURUM RAPORU E-POSTASI — alarmdan bağımsız periyodik özet.
+  // SMTP ayarları yukarıdaki "email" bölümünden alınır.
+  "digest": {
+    "enabled": false,
+    // Ya her N saatte bir:
+    "every_hours": 8,
+    // ...ya da her gün belirli saatte (ayarlıysa every_hours yerine geçer):
+    "daily_at": "08:30",
+    // Boşsa email.to kullanılır:
+    "to": ["yonetici@sirket.com"]
+  },
+
+  "sms": {
+    // Herhangi bir HTTP SMS sağlayıcısıyla çalışır. {message}, {to}, {severity}
+    // yer tutucuları URL, başlık ve gövdede kullanılabilir.
+    "enabled": false,
+    "method": "POST",
+    "url": "https://api.sms-saglayici.com/v1/send",
+    "headers": { "Content-Type": "application/json", "Authorization": "Bearer API_ANAHTARI" },
+    "body": "{\"to\":\"{to}\",\"text\":\"{message}\"}",
+    "to": ["+905550000000"]
+  }
+}

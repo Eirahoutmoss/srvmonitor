@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunucu Teşhis Panosu</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --ink:#1a1d23; --muted:#6b7280;
+    --line:#e5e7eb; --accent:#2563eb;
+    --ok:#16a34a; --warn:#d97706; --crit:#dc2626;
+    --ok-bg:#dcfce7; --warn-bg:#fef3c7; --crit-bg:#fee2e2;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#0f1115; --panel:#171a21; --ink:#e6e8ec; --muted:#9aa3af;
+    --line:#262b34; --accent:#5b8cff;
+    --ok:#34d399; --warn:#fbbf24; --crit:#f87171;
+    --ok-bg:#0f2a1c; --warn-bg:#2a2410; --crit-bg:#2c1414; color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0f1115; --panel:#171a21; --ink:#e6e8ec; --muted:#9aa3af;
+    --line:#262b34; --accent:#5b8cff;
+    --ok:#34d399; --warn:#fbbf24; --crit:#f87171;
+    --ok-bg:#0f2a1c; --warn-bg:#2a2410; --crit-bg:#2c1414; color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{position:sticky;top:0;z-index:5;background:var(--panel);
+    border-bottom:1px solid var(--line);padding:14px 20px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .grow{flex:1}
+  .meta{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+  main{max-width:1180px;margin:0 auto;padding:20px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:26px 0 12px}
+
+  /* health hero */
+  .hero{border-radius:14px;padding:18px 20px;margin-bottom:18px;border:1px solid var(--line);
+    display:flex;align-items:center;gap:16px}
+  .hero.ok{background:var(--ok-bg)} .hero.warn{background:var(--warn-bg)} .hero.crit{background:var(--crit-bg)}
+  .hero .big{font-size:34px;line-height:1}
+  .hero .sum{font-size:17px;font-weight:680}
+  .hero.ok .sum{color:var(--ok)} .hero.warn .sum{color:var(--warn)} .hero.crit .sum{color:var(--crit)}
+  .hero .sub{color:var(--muted);font-size:12px;margin-top:2px}
+
+  .findings{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+  .finding{background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:10px;
+    padding:10px 14px;display:flex;gap:12px;align-items:flex-start}
+  .finding.crit{border-left-color:var(--crit)} .finding.warn{border-left-color:var(--warn)}
+  .finding .ft{font-weight:620}
+  .finding .fd{color:var(--muted);font-size:12px;margin-top:2px;word-break:break-word}
+  .tag{font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:2px 7px;border-radius:999px;
+    font-weight:700;white-space:nowrap;margin-top:1px}
+  .tag.crit{background:var(--crit-bg);color:var(--crit)} .tag.warn{background:var(--warn-bg);color:var(--warn)}
+  .src{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:auto}
+
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .card .v{font-size:26px;font-weight:680;margin-top:4px;font-variant-numeric:tabular-nums}
+  .card .sub{font-size:12px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+  .card.ok{border-left:4px solid var(--ok)} .card.warn{border-left:4px solid var(--warn);background:var(--warn-bg)}
+  .card.crit{border-left:4px solid var(--crit);background:var(--crit-bg)}
+  .bar{height:6px;border-radius:4px;background:var(--line);margin-top:10px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:var(--accent)}
+  .card.warn .bar > i{background:var(--warn)} .card.crit .bar > i{background:var(--crit)}
+  canvas{width:100%;height:44px;display:block;margin-top:8px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+  th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
+  tr:last-child td{border-bottom:none}
+  td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)}
+  .pill.crit{background:var(--crit-bg);color:var(--crit)}
+  button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:5px 10px;cursor:pointer}
+  .off{opacity:.55} .mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <span id="beat" class="dot" style="background:var(--muted)"></span>
+  <h1 id="server">Sunucu Teşhis Panosu</h1>
+  <span class="grow"></span>
+  <span class="meta" id="clock">—</span>
+  <a href="/ayarlar" style="color:var(--accent);text-decoration:none;font-size:13px">⚙ Ayarlar</a>
+  <button id="theme" title="Tema">◐</button>
+</header>
+<main>
+  <div class="hero ok" id="hero">
+    <span class="big" id="heroIcon">✓</span>
+    <div><div class="sum" id="heroSum">Durum okunuyor…</div>
+      <div class="sub" id="heroSub"></div></div>
+  </div>
+
+  <div class="findings" id="findings"></div>
+
+  <h2 id="predHdr" hidden>Öngörüler · Erken Uyarı</h2>
+  <div class="grid" id="predictions"></div>
+
+  <div class="grid" id="tiles"></div>
+
+  <h2>Grafikler (son okumalar)</h2>
+  <div class="grid">
+    <div class="card"><div class="k">CPU %</div><canvas id="c-cpu"></canvas></div>
+    <div class="card"><div class="k">Bellek %</div><canvas id="c-mem"></canvas></div>
+    <div class="card"><div class="k">Swap %</div><canvas id="c-swap"></canvas></div>
+  </div>
+
+  <h2>İzlenen Uygulama / Servisler</h2>
+  <table id="watch"><thead><tr><th>Ad</th><th>Tür</th><th>Durum</th></tr></thead><tbody></tbody></table>
+
+  <h2>Sorunlu Servisler</h2>
+  <table id="services"><thead><tr><th>Servis</th><th>Durum</th><th>Başlatma</th></tr></thead><tbody></tbody></table>
+
+  <h2>Kritik Olaylar · Olay Günlüğü</h2>
+  <table id="events"><thead><tr><th>Zaman</th><th>Düzey</th><th>Kaynak</th><th class="r">ID</th><th>İleti</th></tr></thead><tbody></tbody></table>
+
+  <h2>Diskler</h2>
+  <table id="disks"><thead><tr><th>Bölüm</th><th class="r">Kullanım</th><th class="r">Boş</th><th class="r">Toplam</th><th class="r">%</th></tr></thead><tbody></tbody></table>
+
+  <h2>Ağ</h2>
+  <table id="nets"><thead><tr><th>Arayüz</th><th class="r">İndirme</th><th class="r">Yükleme</th></tr></thead><tbody></tbody></table>
+
+  <h2>Veritabanları</h2>
+  <div id="oracles"></div>
+</main>
+<script>
+const REFRESH = 5000;
+const $ = s => document.querySelector(s);
+const cls = l => l==="KRİTİK"?"crit":l==="UYARI"?"warn":"ok";
+const esc = s => (s==null?"":String(s)).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const fmtBytes = n => { if(n==null) return "—"; const u=["B","KiB","MiB","GiB","TiB","PiB"]; let i=0,x=n; while(x>=1024&&i<u.length-1){x/=1024;i++} return x.toFixed(i?1:0)+" "+u[i]; };
+const fmtBps = n => fmtBytes(n)+"/s";
+const fmtDur = s => { if(s==null) return "—"; const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60); return d?`${d}g ${h}sa`:h?`${h}sa ${m}dk`:`${m}dk`; };
+const ago = t => { const d=(Date.now()-new Date(t))/1000; if(d<60) return "az önce"; if(d<3600) return Math.floor(d/60)+" dk önce"; return Math.floor(d/3600)+" sa önce"; };
+
+const token = new URLSearchParams(location.search).get("token");
+const q = token ? "?token="+encodeURIComponent(token) : "";
+
+let theme = localStorage.getItem("theme");
+if(theme) document.documentElement.dataset.theme = theme;
+$("#theme").onclick = () => { theme=(document.documentElement.dataset.theme==="dark")?"light":"dark";
+  document.documentElement.dataset.theme=theme; try{localStorage.setItem("theme",theme)}catch(e){} };
+
+function tile(k,v,sub,pct,level){
+  const bar = pct==null?"":`<div class="bar"><i style="width:${Math.min(100,pct).toFixed(1)}%"></i></div>`;
+  return `<div class="card ${level||'ok'}"><div class="k">${k}</div><div class="v">${v}</div><div class="sub">${sub||""}</div>${bar}</div>`;
+}
+function lvlFor(active,test){ let w="ok"; for(const k in active){ if(test(k)){ const l=cls(active[k]); if(l==="crit")return"crit"; if(l==="warn")w="warn"; } } return w; }
+
+async function refresh(){
+  let d;
+  try{ d=await (await fetch("/api/status"+q)).json(); }
+  catch(e){ $("#beat").style.background="var(--crit)"; return; }
+  $("#beat").style.background="var(--ok)";
+  $("#server").textContent=d.server||"Sunucu Teşhis Panosu";
+  $("#clock").textContent=new Date(d.generated).toLocaleString("tr-TR");
+
+  // health hero
+  const H=d.health||{level:"NORMAL",summary:"",findings:[]};
+  const hc=cls(H.level);
+  $("#hero").className="hero "+hc;
+  $("#heroIcon").textContent=hc==="crit"?"⛔":hc==="warn"?"⚠":"✓";
+  $("#heroSum").textContent=H.summary||"—";
+  $("#heroSub").textContent=(H.findings&&H.findings.length)?`${H.findings.length} bulgu · ${new Date(d.generated).toLocaleTimeString("tr-TR")}`:"Aktif bulgu yok";
+
+  // findings
+  $("#findings").innerHTML=(H.findings||[]).map(f=>{
+    const c=cls(f.level);
+    return `<div class="finding ${c}"><span class="tag ${c}">${f.level}</span>
+      <div><div class="ft">${esc(f.title)}</div>${f.detail?`<div class="fd">${esc(f.detail)}</div>`:""}</div>
+      <span class="src">${esc(f.source||"")}</span></div>`;
+  }).join("");
+
+  // predictions (early warning)
+  const preds=d.predictions||[];
+  $("#predHdr").hidden = preds.length===0;
+  $("#predictions").innerHTML = preds.map(p=>{
+    const c=cls(p.level);
+    const etaH = p.eta_hours>=1 ? p.eta_hours.toFixed(1)+" sa" : Math.round(p.eta_hours*60)+" dk";
+    return `<div class="card ${c}"><div class="k">⏳ ${esc(p.subject)}</div>
+      <div class="v" style="font-size:20px">~${etaH}</div>
+      <div class="sub">şu an %${p.current.toFixed(0)} · +%${p.rate_per_hour.toFixed(1)}/sa ile dolar</div>
+      <div class="bar"><i style="width:${Math.min(100,p.current).toFixed(1)}%"></i></div></div>`;
+  }).join("");
+
+  const a=d.active||{};
+  if(!d.has_data){ $("#tiles").innerHTML=tile("Durum","Veri bekleniyor","İlk okuma yapılıyor…"); return; }
+  const s=d.sample.system;
+
+  const tiles=[];
+  tiles.push(tile("CPU",s.cpu_percent.toFixed(1)+"%","İşlemci",s.cpu_percent,lvlFor(a,k=>k==="cpu.percent")));
+  tiles.push(tile("Bellek",s.mem_percent.toFixed(1)+"%",fmtBytes(s.mem_used)+" / "+fmtBytes(s.mem_total),s.mem_percent,lvlFor(a,k=>k==="mem.percent")));
+  tiles.push(tile("Swap",s.swap_percent.toFixed(1)+"%",fmtBytes(s.swap_used)+" / "+fmtBytes(s.swap_total),s.swap_percent,lvlFor(a,k=>k==="swap.percent")));
+  tiles.push(tile("Çalışma Süresi",fmtDur(s.uptime_sec),(s.procs||0)+" süreç",null,"ok"));
+  const svc=(d.sample.services||[]);
+  tiles.push(tile("Sorunlu Servis",String(svc.length),svc.length?"otomatik ama durmuş":"tümü çalışıyor",null,svc.length?"crit":"ok"));
+  const dbAll=(d.sample.databases||[]),dbUp=dbAll.filter(o=>o.up).length;
+  if(dbAll.length) tiles.push(tile("Veritabanı",dbUp+" / "+dbAll.length,"erişilebilir",null,dbUp<dbAll.length?"crit":"ok"));
+  $("#tiles").innerHTML=tiles.join("");
+
+  // watched items
+  const wl=(d.sample.watch||[]);
+  $("#watch tbody").innerHTML=wl.map(x=>{
+    const c=x.up?"ok":(x.state==="Bilinmiyor"||x.state.indexOf("Tanımsız")===0?"warn":"crit");
+    const dot=x.up?"● ":"○ ";
+    return `<tr><td>${esc(x.name)}</td><td class="meta">${esc(x.kind)}</td><td><span class="pill ${c}">${dot}${esc(x.state)}</span></td></tr>`;
+  }).join("")||`<tr><td colspan="3" class="off">İzlenen öğe tanımlı değil</td></tr>`;
+
+  // services
+  $("#services tbody").innerHTML=svc.map(x=>
+    `<tr><td>${esc(x.display||x.name)}<div class="fd mono">${esc(x.name)}</div></td><td><span class="pill crit">${esc(x.state)}</span></td><td>${esc(x.start_type)}</td></tr>`
+  ).join("")||`<tr><td colspan="3" class="off">Sorunlu servis yok</td></tr>`;
+
+  // events
+  $("#events tbody").innerHTML=(d.sample.events||[]).map(e=>{
+    const c=e.level==="Kritik"?"crit":"warn";
+    return `<tr><td class="meta">${ago(e.time)}</td><td><span class="pill ${c}">${esc(e.level)}</span></td>
+      <td>${esc(e.provider||e.log)}<div class="fd">${esc(e.log)}</div></td><td class="r mono">${e.id}</td>
+      <td class="fd">${esc(e.message)}</td></tr>`;
+  }).join("")||`<tr><td colspan="5" class="off">Kritik/hata olay yok</td></tr>`;
+
+  // disks
+  $("#disks tbody").innerHTML=(s.disks||[]).map(x=>{
+    const lv=lvlFor(a,k=>k==="disk."+x.path+".percent");
+    return `<tr><td>${esc(x.path)}</td><td class="r">${fmtBytes(x.used)}</td><td class="r">${fmtBytes(x.free)}</td><td class="r">${fmtBytes(x.total)}</td><td class="r"><span class="pill ${lv}">${x.used_percent.toFixed(1)}%</span></td></tr>`;
+  }).join("")||`<tr><td colspan="5" class="off">Bölüm yok</td></tr>`;
+
+  // nets
+  $("#nets tbody").innerHTML=(s.nets||[]).map(x=>
+    `<tr><td>${esc(x.name)}</td><td class="r">${fmtBps(x.rx_bytes_sec)}</td><td class="r">${fmtBps(x.tx_bytes_sec)}</td></tr>`
+  ).join("")||`<tr><td colspan="3" class="off">Veri yok</td></tr>`;
+
+  // databases (oracle/postgres/mysql)
+  $("#oracles").innerHTML=dbAll.map(o=>{
+    const T=(o.type||"db").toUpperCase();
+    if(!o.up) return `<div class="card crit" style="margin-bottom:12px"><div class="k">${T} · ${esc(o.name)}</div><div class="v">ERİŞİLEMİYOR</div><div class="sub">${esc((o.error||"").slice(0,160))}</div></div>`;
+    const sLv=lvlFor(a,k=>k==="db."+o.name+".session_percent");
+    const ts=(o.spaces||[]).slice(0,8).map(t=>{
+      const lv=lvlFor(a,k=>k==="db."+o.name+".space."+t.name+".percent");
+      return `<tr><td>${esc(t.name)}</td><td class="r"><span class="pill ${lv}">${t.used_percent.toFixed(1)}%</span></td></tr>`;
+    }).join("");
+    return `<div class="card ok" style="margin-bottom:12px">
+      <div class="k">${T} · ${esc(o.name)}</div>
+      <div class="v" style="font-size:18px">${esc(o.status||"OPEN")} · ${fmtDur(o.uptime_sec)}</div>
+      <div class="sub">Bağlantı: <span class="pill ${sLv}">${o.sessions}/${o.max_sessions} (${o.session_percent.toFixed(1)}%)</span>
+        · Bloklayan: ${o.blocking_sessions} · Buffer hit: ${o.buffer_hit_ratio.toFixed(1)}% · Gecikme: ${o.latency_ms.toFixed(0)} ms</div>
+      ${ts?`<table style="margin-top:10px"><thead><tr><th>Alan</th><th class="r">Doluluk</th></tr></thead><tbody>${ts}</tbody></table>`:""}
+    </div>`;
+  }).join("")||`<div class="card off">Yapılandırılmış veritabanı bağlantısı yok</div>`;
+
+  drawCharts();
+}
+
+async function drawCharts(){
+  let pts; try{ pts=await (await fetch("/api/history"+q)).json(); }catch(e){ return; }
+  spark("#c-cpu",pts.map(p=>p.cpu)); spark("#c-mem",pts.map(p=>p.mem)); spark("#c-swap",pts.map(p=>p.swap));
+}
+function spark(sel,data){
+  const cv=$(sel); if(!cv) return;
+  const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  cv.width=w*dpr; cv.height=h*dpr; const ctx=cv.getContext("2d"); ctx.scale(dpr,dpr); ctx.clearRect(0,0,w,h);
+  if(data.length<2) return;
+  const accent=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  const max=100,n=data.length,dx=w/(n-1);
+  ctx.beginPath(); data.forEach((v,i)=>{const x=i*dx,y=h-(Math.max(0,Math.min(max,v))/max)*(h-4)-2; i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.strokeStyle=accent; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath(); ctx.globalAlpha=.12; ctx.fillStyle=accent; ctx.fill(); ctx.globalAlpha=1;
+  const last=data[n-1],ly=h-(Math.max(0,Math.min(max,last))/max)*(h-4)-2;
+  ctx.beginPath(); ctx.arc((n-1)*dx,ly,2.5,0,7); ctx.fillStyle=accent; ctx.fill();
+}
+
+refresh(); setInterval(refresh,REFRESH);
+</script>
+</body>
+</html>

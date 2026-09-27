@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>srvmon Ayarlar</title>
+<style>
+  :root{--bg:#f5f6f8;--panel:#fff;--ink:#1a1d23;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;
+    --ok:#16a34a;--crit:#dc2626;--ok-bg:#dcfce7;--crit-bg:#fee2e2;color-scheme:light;}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--panel:#171a21;--ink:#e6e8ec;
+    --muted:#9aa3af;--line:#262b34;--accent:#5b8cff;--ok:#34d399;--crit:#f87171;--ok-bg:#0f2a1c;--crit-bg:#2c1414;color-scheme:dark;}}
+  :root[data-theme="dark"]{--bg:#0f1115;--panel:#171a21;--ink:#e6e8ec;--muted:#9aa3af;--line:#262b34;--accent:#5b8cff;
+    --ok:#34d399;--crit:#f87171;--ok-bg:#0f2a1c;--crit-bg:#2c1414;color-scheme:dark;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:14px 20px;
+    display:flex;align-items:center;gap:14px;z-index:5}
+  header h1{font-size:16px;margin:0;font-weight:650}
+  a{color:var(--accent);text-decoration:none}
+  main{max-width:920px;margin:0 auto;padding:20px}
+  fieldset{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:0 0 16px;padding:14px 16px}
+  legend{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;padding:0 6px}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 3px}
+  input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);
+    border-radius:8px;padding:7px 10px}
+  textarea{font-family:ui-monospace,Consolas,monospace;font-size:12px;min-height:70px}
+  .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:12px}
+  .chk input{width:auto}
+  .hint{font-size:11px;color:var(--muted);margin-top:3px}
+  .dbrow{display:grid;grid-template-columns:1fr 130px 3fr auto;gap:8px;align-items:end;margin-bottom:8px}
+  button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;
+    padding:7px 12px;cursor:pointer}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  button.sm{padding:4px 9px;font-size:12px}
+  .bar{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 20px;
+    display:flex;gap:12px;align-items:center}
+  .msg{font-weight:600} .msg.ok{color:var(--ok)} .msg.err{color:var(--crit)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚙ srvmon Ayarları</h1>
+  <a href="/">← Panoya dön</a>
+</header>
+<main>
+  <fieldset><legend>Genel</legend>
+    <div class="row">
+      <div><label>Sunucu adı</label><input id="server_name"></div>
+      <div><label>Ölçüm aralığı (sn)</label><input id="poll_seconds" type="number" min="1"></div>
+      <div><label>Derin tarama aralığı (sn)</label><input id="deep_seconds" type="number" min="5"></div>
+    </div>
+    <div class="row">
+      <div><label>Olay penceresi (dk)</label><input id="event_window_minutes" type="number" min="1"></div>
+      <div><label>En fazla olay</label><input id="event_max" type="number" min="1"></div>
+      <div><label>Geçmiş örnek sayısı</label><input id="history_samples" type="number" min="1"></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Web / Pano</legend>
+    <div class="row">
+      <div><label>Dinlenen adres</label><input id="web_listen" placeholder=":8085">
+        <div class="hint">Değişiklik yeniden başlatmayla geçerli olur.</div></div>
+      <div><label>Erişim anahtarı (token)</label><input id="web_token" placeholder="(boş = korumasız)">
+        <div class="hint">Ayarlandığında API ?token=... ister.</div></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>Veritabanları</legend>
+    <div id="dbs"></div>
+    <button class="sm" onclick="addDB()">+ Veritabanı ekle</button>
+    <div class="hint">Tür: oracle / postgres / mysql. DSN örnekleri README'de.</div>
+  </fieldset>
+
+  <fieldset><legend>E-posta (SMTP)</legend>
+    <div class="chk"><input type="checkbox" id="email_enabled"><label style="margin:0">E-posta alarmları etkin</label></div>
+    <div class="row">
+      <div><label>SMTP sunucu</label><input id="email_host"></div>
+      <div><label>Port</label><input id="email_port" type="number"></div>
+      <div class="chk" style="align-self:end"><input type="checkbox" id="email_starttls"><label style="margin:0">STARTTLS</label></div>
+    </div>
+    <div class="row">
+      <div><label>Kullanıcı adı</label><input id="email_username"></div>
+      <div><label>Parola</label><input id="email_password" type="password"></div>
+    </div>
+    <div class="row">
+      <div><label>Gönderen</label><input id="email_from"></div>
+      <div><label>Alıcılar (virgülle)</label><input id="email_to"></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>SMS (HTTP API)</legend>
+    <div class="chk"><input type="checkbox" id="sms_enabled"><label style="margin:0">SMS alarmları etkin</label></div>
+    <div class="row">
+      <div><label>Yöntem</label><input id="sms_method" placeholder="POST"></div>
+      <div><label>URL</label><input id="sms_url" placeholder="https://... {to} {message}"></div>
+    </div>
+    <label>Başlıklar (JSON)</label><textarea id="sms_headers" placeholder='{"Authorization":"Bearer ..."}'></textarea>
+    <label>Gövde (metin, {to}/{message}/{severity})</label><textarea id="sms_body"></textarea>
+    <label>Alıcı numaralar (virgülle)</label><input id="sms_to">
+    <div class="hint">{message}, {to}, {severity} yer tutucuları URL, başlık ve gövdede kullanılabilir.</div>
+  </fieldset>
+
+  <fieldset><legend>Durum Raporu E-postası</legend>
+    <div class="chk"><input type="checkbox" id="digest_enabled"><label style="margin:0">Periyodik durum raporu gönder</label></div>
+    <div class="row">
+      <div><label>Her N saatte bir</label><input id="digest_every_hours" type="number" min="1"></div>
+      <div><label>veya her gün saat (SS:DD)</label><input id="digest_daily_at" placeholder="08:30"></div>
+      <div><label>Alıcılar (virgülle, boş=e-posta alıcıları)</label><input id="digest_to"></div>
+    </div>
+  </fieldset>
+
+  <fieldset><legend>İzlenen Uygulama/Servisler</legend>
+    <label>Servis adları (virgülle)</label><input id="watch_services" placeholder="MSSQLSERVER, W3SVC">
+    <label>Süreç adları (virgülle)</label><input id="watch_processes" placeholder="MyApp.exe">
+    <label>Sağlık uçları (JSON dizi)</label>
+    <textarea id="watch_endpoints" placeholder='[{"name":"API","url":"http://localhost:8080/health"}]'></textarea>
+  </fieldset>
+
+  <fieldset><legend>Kurallar (gelişmiş, JSON)</legend>
+    <textarea id="rules" style="min-height:180px"></textarea>
+    <div class="hint">Her kural: id, desc, key, compare (gt/lt), warn, crit, for, cooldown, channels[].</div>
+  </fieldset>
+</main>
+<div class="bar">
+  <button class="primary" id="save">Kaydet ve uygula</button>
+  <span class="msg" id="msg"></span>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+if(localStorage.getItem("theme")) document.documentElement.dataset.theme=localStorage.getItem("theme");
+const token=new URLSearchParams(location.search).get("token");
+const q=token?"?token="+encodeURIComponent(token):"";
+let cfg={};
+
+const csv=a=>(a||[]).join(", ");
+const arr=s=>s.split(",").map(x=>x.trim()).filter(Boolean);
+
+function fillDBs(){
+  $("#dbs").innerHTML="";
+  (cfg.databases||[]).forEach((d,i)=>{
+    const el=document.createElement("div"); el.className="dbrow";
+    el.innerHTML=`<div><label>Ad</label><input value="${d.name||''}" data-k="name" data-i="${i}"></div>
+      <div><label>Tür</label><select data-k="type" data-i="${i}">
+        ${["oracle","postgres","mysql"].map(t=>`<option ${d.type===t?"selected":""}>${t}</option>`).join("")}</select></div>
+      <div><label>DSN</label><input value="${(d.dsn||'').replace(/"/g,'&quot;')}" data-k="dsn" data-i="${i}"></div>
+      <button class="sm" data-del="${i}">Sil</button>`;
+    $("#dbs").appendChild(el);
+  });
+  $("#dbs").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{cfg.databases.splice(+b.dataset.del,1);fillDBs();});
+}
+function addDB(){ (cfg.databases=cfg.databases||[]).push({name:"",type:"oracle",dsn:""}); fillDBs(); }
+
+function collectDBs(){
+  $("#dbs").querySelectorAll("input,select").forEach(el=>{
+    cfg.databases[+el.dataset.i][el.dataset.k]=el.value;
+  });
+}
+
+function load(){
+  fetch("/api/config"+q).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(c=>{
+    cfg=c;
+    $("#server_name").value=c.server_name||"";
+    $("#poll_seconds").value=c.poll_seconds||15;
+    $("#deep_seconds").value=c.deep_seconds||60;
+    $("#event_window_minutes").value=c.event_window_minutes||30;
+    $("#event_max").value=c.event_max||50;
+    $("#history_samples").value=c.history_samples||240;
+    $("#web_listen").value=(c.web||{}).listen||":8085";
+    $("#web_token").value=(c.web||{}).token||"";
+    const e=c.email||{};
+    $("#email_enabled").checked=!!e.enabled; $("#email_host").value=e.host||""; $("#email_port").value=e.port||587;
+    $("#email_starttls").checked=!!e.starttls; $("#email_username").value=e.username||""; $("#email_password").value=e.password||"";
+    $("#email_from").value=e.from||""; $("#email_to").value=csv(e.to);
+    const s=c.sms||{};
+    $("#sms_enabled").checked=!!s.enabled; $("#sms_method").value=s.method||"POST"; $("#sms_url").value=s.url||"";
+    $("#sms_headers").value=JSON.stringify(s.headers||{},null,0); $("#sms_body").value=s.body||""; $("#sms_to").value=csv(s.to);
+    const g=c.digest||{};
+    $("#digest_enabled").checked=!!g.enabled; $("#digest_every_hours").value=g.every_hours||8;
+    $("#digest_daily_at").value=g.daily_at||""; $("#digest_to").value=csv(g.to);
+    const w=c.watch||{};
+    $("#watch_services").value=csv(w.services); $("#watch_processes").value=csv(w.processes);
+    $("#watch_endpoints").value=JSON.stringify(w.endpoints||[],null,2);
+    $("#rules").value=JSON.stringify(c.rules||[],null,2);
+    fillDBs();
+  }).catch(err=>{ $("#msg").className="msg err"; $("#msg").textContent="Yüklenemedi: "+err.message; });
+}
+
+function save(){
+  const msg=$("#msg"); msg.className="msg"; msg.textContent="Kaydediliyor…";
+  try{
+    collectDBs();
+    cfg.server_name=$("#server_name").value;
+    cfg.poll_seconds=+$("#poll_seconds").value; cfg.deep_seconds=+$("#deep_seconds").value;
+    cfg.event_window_minutes=+$("#event_window_minutes").value; cfg.event_max=+$("#event_max").value;
+    cfg.history_samples=+$("#history_samples").value;
+    cfg.web=Object.assign(cfg.web||{},{listen:$("#web_listen").value,token:$("#web_token").value});
+    cfg.email=Object.assign(cfg.email||{},{enabled:$("#email_enabled").checked,host:$("#email_host").value,
+      port:+$("#email_port").value,starttls:$("#email_starttls").checked,username:$("#email_username").value,
+      password:$("#email_password").value,from:$("#email_from").value,to:arr($("#email_to").value)});
+    cfg.sms=Object.assign(cfg.sms||{},{enabled:$("#sms_enabled").checked,method:$("#sms_method").value,
+      url:$("#sms_url").value,headers:JSON.parse($("#sms_headers").value||"{}"),body:$("#sms_body").value,
+      to:arr($("#sms_to").value)});
+    cfg.digest=Object.assign(cfg.digest||{},{enabled:$("#digest_enabled").checked,
+      every_hours:+$("#digest_every_hours").value,daily_at:$("#digest_daily_at").value,to:arr($("#digest_to").value)});
+    cfg.watch=Object.assign(cfg.watch||{},{services:arr($("#watch_services").value),
+      processes:arr($("#watch_processes").value),endpoints:JSON.parse($("#watch_endpoints").value||"[]")});
+    cfg.rules=JSON.parse($("#rules").value||"[]");
+  }catch(err){ msg.className="msg err"; msg.textContent="Geçersiz JSON: "+err.message; return; }
+
+  fetch("/api/config"+q,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)})
+    .then(r=>r.json()).then(res=>{
+      if(res.ok){ msg.className="msg ok"; msg.textContent="✓ Kaydedildi ve uygulandı."; }
+      else { msg.className="msg err"; msg.textContent="Hata: "+(res.error||"bilinmiyor"); }
+    }).catch(err=>{ msg.className="msg err"; msg.textContent="Gönderilemedi: "+err.message; });
+}
+$("#save").onclick=save;
+load();
+</script>
+</body>
+</html>
